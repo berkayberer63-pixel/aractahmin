@@ -1,0 +1,97 @@
+
+/* Genel sayfa */
+.stApp {
+    background-color: #F5F5F2;
+    color: #1B2942;
+    font-family: "Segoe UI", sans-serif;
+}
+
+[data-testid="stHeader"] {
+    background: transparent;
+}
+
+h1, h2, h3 {
+    color: #1B2942 !important;
+    font-weight: 700 !important;
+}
+
+/* Sol menü */
+section[data-testid="stSidebar"] {
+    background-color: #192943 !important;
+    border-right: 1px solid #34445F;
+}
+
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3,
+section[data-testid="stSidebar"] p,
+section[data-testid="stSidebar"] label {
+    color: #F5F5F0 !important;
+}
+
+/* Tahmin kartları */
+div[data-testid="stMetric"] {
+    background-color: #FFFFFF;
+    border: 1px solid #E1E5EB;
+    border-radius: 14px;
+    padding: 18px 20px;
+    box-shadow: 0 4px 1px rgba(25, 41, 67, 0.05);
+}
+
+div[data-testid="stMetricValue"] {
+    color: #1B2942 !important;
+    font-weight: 700 !important;
+}
+
+/* Butonlar */
+[data-testid="stFormSubmitButton"] button {
+    background-color: #E7D9BB !important;
+    color: #192943 !important;
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+}
+
+/* Üst başlık */
+.hero-card {
+    background: linear-gradient(120deg, #192943, #304967);
+    border: 1px solid #3A506F;
+    border-radius: 18px;
+    padding: 28px 30px;
+    margin-bottom: 26px;
+}
+
+.hero-label {
+    color: #E7D9BB !important;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+}
+
+.hero-card h1 {
+    color: #F7F6F0 !important;
+    font-size: 32px;
+}
+
+.hero-card p {
+    color: #DCE4EF !important;
+}
+
+/* Tablo */
+[data-testid="stTable"] th {
+    background-color: #192943 !important;
+    color: #F5F5F0 !important;
+    font-size: 18px !important; /* Başlık yazısının boyutu (Büyütmek için artırın) */
+    padding: 15px 25px !important; /* Kutu boyutu: üst-alt 15px, sağ-sol 25px boşluk */
+}
+
+[data-testid="stTable"] td {
+    background-color: #FFFFFF !important;
+    color: #24344E !important;
+    font-size: 24px !important; /* İçerik yazısının boyutu */
+    padding: 15px 25px !important; /* Kutu boyutu (büyütmek için rakamları artırın) */
+}
+
+/* Ayırıcılar */
+hr {
+    border-color: #D9DEE6 !important;
+}
