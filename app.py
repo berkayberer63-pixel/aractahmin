@@ -4,12 +4,14 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 
+# Sayfa düzeni ve tarayıcı sekme başlığı
 st.set_page_config(
     layout="wide",
     page_title="Ford Araç Fiyat Tahmini",
 )
 
-# CSS dosyasını yükle
+
+# Harici CSS dosyasını okuyup sayfaya uygular
 def css_yukle(dosya_yolu):
     try:
         with open(dosya_yolu, "r", encoding="utf-8") as dosya:
@@ -18,26 +20,27 @@ def css_yukle(dosya_yolu):
     except FileNotFoundError:
         pass
 
+
 css_yukle("style.css")
 
 
-
-# ================= 1) VERİ SETİNİ OKUMA VE MODEL EĞİTİMİ (EKSİK VERİ KONTROLLÜ) =================
+# Veri setini okur, temizler ve %80-%90 eğitim oranlarıyla Lineer Regresyon + Random Forest modellerini eğitir
 @st.cache_resource
 def modeli_egit_ve_hazirla(agac_sayisi, agac_derinligi):
     sutunlar = ["year", "mileage", "tax", "mpg", "engineSize"]
     X, y = [], []
-    
+
+    # CSV dosyasından geçerli satırları oku (2025 sonrası hatalı yılları ve eksik değerleri atla)
     with open("ford.csv", encoding="utf-8") as dosya:
         for r in csv.DictReader(dosya):
             try:
                 yil = float(r["year"])
                 if yil > 2025:
                     continue
-                
+
                 satir_degerleri = [float(r[s]) for s in sutunlar]
                 fiyat = float(r["price"])
-                
+
                 X.append(satir_degerleri)
                 y.append(fiyat)
             except (ValueError, KeyError, TypeError):
@@ -45,10 +48,12 @@ def modeli_egit_ve_hazirla(agac_sayisi, agac_derinligi):
 
     X, y = np.array(X), np.array(y)
 
+    # Eğitim/test ayrımı öncesi veriyi sabit tohumla karıştır
     np.random.seed(42)
     sira = np.random.permutation(len(X))
     X, y = X[sira], y[sira]
 
+    # Tek bir karar ağacı kurar (en düşük hata veren özellik ve eşik değerine göre dallanır)
     def agac_kur(X, y, derinlik):
         if derinlik == 0 or len(y) < 30:
             return y.mean()
@@ -66,18 +71,22 @@ def modeli_egit_ve_hazirla(agac_sayisi, agac_derinligi):
         j, esik, sol = en_iyi
         return (j, esik, agac_kur(X[sol], y[sol], derinlik - 1), agac_kur(X[~sol], y[~sol], derinlik - 1))
 
+    # Kurulan karar ağacından tek bir örnek için tahmin üretir
     def agac_tahmin(agac, x):
         while isinstance(agac, tuple):
             j, esik, sol, sag = agac
             agac = sol if x[j] <= esik else sag
         return agac
 
+    # Random Forest: tüm ağaçların tahminlerinin ortalamasını alır
     def rf_tahmin(agaclar, X):
         return np.array([np.mean([agac_tahmin(a, x) for a in agaclar]) for x in X])
 
+    # Lineer Regresyon: ağırlık vektörü ile doğrusal tahmin üretir
     def lr_tahmin(w, X):
         return np.column_stack([np.ones(len(X)), X]) @ w
 
+    # Gerçek ve tahmin edilen değerler üzerinden R² ve RMSE başarısını hesaplar
     def olc(yt, p):
         r2 = 1 - ((yt - p) ** 2).sum() / ((yt - yt.mean()) ** 2).sum()
         return {
@@ -85,13 +94,17 @@ def modeli_egit_ve_hazirla(agac_sayisi, agac_derinligi):
             "rmse": round(float(np.sqrt(((yt - p) ** 2).mean()))),
         }
 
+    # %80 ve %90 eğitim oranları için modelleri eğit ve test metriklerini kaydet
     modeller, metrikler = {}, {}
     for oran in (80, 90):
         n = int(len(X) * oran / 100)
         X_egitim, y_egitim, X_test, y_test = X[:n], y[:n], X[n:], y[n:]
 
+        # Lineer Regresyon ağırlıklarını normal denklem ile hesapla
         A = np.column_stack([np.ones(n), X_egitim])
         w = np.linalg.solve(A.T @ A, A.T @ y_egitim)
+
+        # Bootstrap örnekleme ile Random Forest ağaçlarını oluştur
         agaclar = []
         for _ in range(agac_sayisi):
             i = np.random.randint(0, n, n)
@@ -105,12 +118,13 @@ def modeli_egit_ve_hazirla(agac_sayisi, agac_derinligi):
     return modeller, metrikler
 
 
-# ================= 2) STREAMLIT ARAYÜZÜ (FORM İLE KONTROL) =================
+# Sayfa ana başlığı ve tahmin durumunu tutan session_state başlatma
 st.title("Ford Araç Fiyat Tahmini ve Model Karşılaştırma")
 
 if "hesaplandi" not in st.session_state:
     st.session_state.hesaplandi = False
 
+# Sol kenar çubuğunda araç özellikleri ve Random Forest ayarları formu
 with st.sidebar.form("arac_formu"):
     st.header("Araç Özellikleri")
     yil = st.number_input("Üretim Yılı", value=2018, step=1)
@@ -132,12 +146,14 @@ with st.sidebar.form("arac_formu"):
         st.session_state.agac_sayisi = secilen_agac_sayisi
         st.session_state.agac_derinligi = secilen_derinlik
 
+# Seçilen parametrelerle modelleri yükle/eğit
 aktif_agac_sayisi = st.session_state.get("agac_sayisi", 8)
 aktif_derinlik = st.session_state.get("agac_derinligi", 4)
 
 with st.spinner("Modeller yükleniyor..."):
     modeller, metrikler = modeli_egit_ve_hazirla(aktif_agac_sayisi, aktif_derinlik)
 
+# Butona basıldıysa %80 ve %90 eğitim oranlarına göre tahmin kartlarını göster
 if st.session_state.hesaplandi:
     x_giris = st.session_state.x_giris
     col1, col2 = st.columns(2)
@@ -154,6 +170,7 @@ if st.session_state.hesaplandi:
 
 st.divider()
 
+# Tüm modellerin R² ve RMSE başarı metriklerini tablo olarak listele
 st.subheader("Model Başarı Oranları")
 tablo_verisi = [
     {"Model": "Lineer Regresyon", "Eğitim Oranı": "%80", "Başarı (R²)": f"%{metrikler['lr80']['r2']*100:.1f}", "RMSE (Hata)": f"£{metrikler['lr80']['rmse']}"},
@@ -165,44 +182,32 @@ st.table(tablo_verisi)
 
 st.divider()
 
-# ================= 3) GRAFİK BÖLÜMÜ (Ağaç Derinliğinin Etkisi) =================
+# Farklı ağaç derinliklerinin (2-7) Random Forest R² başarısına etkisini hesapla ve alan grafiğiyle çiz
 st.subheader("Ağaç Derinliğinin Başarıya Etkisi")
 st.write(f"*(Ağaç Sayısı: {aktif_agac_sayisi} - %80 Eğitim Seti)*")
 
-derinlikler = [2, 3, 4, 5, 6, 7] # Test edilecek derinlikler
+derinlikler = [2, 3, 4, 5, 6, 7]
 basari_oranlari = []
 
 with st.spinner("Grafik için farklı derinlikler test ediliyor..."):
     for d in derinlikler:
-        # Sadece R2 sonucunu almak için fonksiyonumuzu farklı derinlik değerleriyle çağırıyoruz
         _, test_metrikleri = modeli_egit_ve_hazirla(aktif_agac_sayisi, d)
         basari_oranlari.append(test_metrikleri['rf80']['r2'] * 100)
-
 
 df_grafik = pd.DataFrame({
     "Derinlik": derinlikler,
     "Başarı Oranı (%)": basari_oranlari
 }).set_index("Derinlik")
 
-# Ekranı ikiye bölüyoruz (col1 sol yarı, col2 sağ yarı)
-# [1, 1] oranı ekranı tam ortadan ikiye böler. Grafiği daha büyük/küçük isterseniz oranları [6, 4] gibi değiştirebilirsiniz.
-# Ekranı ikiye bölüyoruz (Grafik sağa doğru uzamasın diye)
 col1, col2 = st.columns([1, 1])
 
 with col1:
-    # Plotly'nin veriyi okuyabilmesi için index'i sıfırlıyoruz
     df_reset = df_grafik.reset_index()
-    
-    # px.area ile alan grafiği oluşturup, markers=True ile kesişim noktalarını ekliyoruz
     fig = px.area(
-        df_reset, 
-        x="Derinlik", 
-        y="Başarı Oranı (%)", 
-        markers=True # Kesişim yerlerine nokta koyan sihirli ayar
+        df_reset,
+        x="Derinlik",
+        y="Başarı Oranı (%)",
+        markers=True
     )
-    
-    # İsteğe bağlı: Arka planı transparan yapmak ve renkleri temanıza uydurmak için
     fig.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
-    
-    # Grafiği ekrana basıyoruz
     st.plotly_chart(fig, use_container_width=True)
