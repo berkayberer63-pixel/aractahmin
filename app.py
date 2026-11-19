@@ -178,7 +178,7 @@ with st.spinner("Grafik için farklı derinlikler test ediliyor..."):
         _, test_metrikleri = modeli_egit_ve_hazirla(aktif_agac_sayisi, d)
         basari_oranlari.append(test_metrikleri['rf80']['r2'] * 100)
 
-# Veriyi tablo haline getirip çizdiriyoruz
+
 df_grafik = pd.DataFrame({
     "Derinlik": derinlikler,
     "Başarı Oranı (%)": basari_oranlari
